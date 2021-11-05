@@ -19,21 +19,22 @@ spa.model = (function () {
       anon_id: 'a0'
     },
     stateMap = {
-      anoun_user: null,
+      anon_user: null,
       cid_serial: 0,
+      is_connected: false,
       people_cid_map: {},
       people_db: TAFFY()
     },
 
     isFakeData = true,
-    personProto, makeCid, clearPeopleDb, completeLogin, makePerson, removePerson, people, initModule;
+    personProto, makeCid, clearPeopleDb, completeLogin, makePerson, removePerson, people, chat, initModule;
 
     personProto = {
       get_is_user: function() {
         return this.cid === stateMap.user.cid;
       },
       get_is_anon: function() {
-        return this.cid === stateMap.anoun_user.cid;
+        return this.cid === stateMap.anon_user.cid;
       }
     };
 
@@ -134,7 +135,7 @@ spa.model = (function () {
         var is_removed, user= stateMap.user;
 
         is_removed = removePerson(user);
-        stateMap.user = stateMap.anoun_user;
+        stateMap.user = stateMap.anon_user;
 
         $.gevent.publish('spa-logout', [user]);
         return is_removed;
@@ -149,32 +150,85 @@ spa.model = (function () {
       };
     }());
 
-    initModule = function() {
-      var i, people_list, person_map;
+    chat = (function() {
+      var
+        _publish_listchange, _update_list, _leave_chat, join_chat;
 
-      stateMap.anoun_user = makePerson({
+        _update_list = function(arg_list) {
+          var i, person_map, make_person_map,
+          people_list = arg_list[0];
+
+          clearPeopleDb();
+
+          PERSON:
+          for(i = 0; i < people_list.length; i++) {
+            person_map = people_list[i];
+            if(!person_map.name) {
+              continue PERSON;
+            }
+            if(stateMap.user && stateMap.user.id === person_map._id) {
+              stateMap.user.css_map = person_map.css_map;
+              continue PERSON;
+            }
+            make_person_map = {
+              cid: person_map._id,
+              css_map: person_map.css_map,
+              id: person_map._id,
+              name: person_map.name
+            };
+            makePerson(make_person_map);
+          }
+          stateMap.people_db.sort('name');
+        };
+
+        _publish_listchange = function(arg_list) {
+          _update_list(arg_list);
+          $.gevent.publish('spa-listchange', [arg_list]);
+        };
+
+        _leave_chat = function() {
+          var sio = isFakeData ? spa.fake.mockSio : spa.data.getSio();
+          stateMap.is_connected = false;
+          if(sio) {
+            sio.emit('leavechat');
+          }
+        };
+
+        join_chat = function() {
+          var sio;
+          if(stateMap.is_connected) {
+            return false;
+          }
+
+          if(stateMap.user.get_is_anon()) {
+            console.warn('User must be defined before joining chat');
+            return false;
+          }
+
+          sio = isFakeData ? spa.fake.mockSio: spa.data.getSio();
+          sio.on('listchange', _publish_listchange);
+          stateMap.is_connected = true;
+          return true;
+        };
+
+        return {
+          _leave: _leave_chat,
+          join: join_chat
+        };
+    }());
+
+    initModule = function() {
+      stateMap.anon_user = makePerson({
         cid: configMap.anon_id,
         id: configMap.anon_id,
-        name: 'anounymous'
+        name: 'anonymous'
       });
-      stateMap.user = stateMap.anoun_user;
-
-      if(isFakeData) {
-        people_list = spa.fake.getPeopleList();
-        for(i = 0; i < people_list.length; i++) {
-          person_map = people_list[i];
-          makePerson({
-            cid: person_map._id,
-            css_map: person_map.css_map,
-            id: person_map.id,
-            name: person_map.name
-          });
-        }
-      }
+      stateMap.user = stateMap.anon_user;
     };
 
   return {
     initModule: initModule,
+    chat: chat,
     people: people
   };
 }());
