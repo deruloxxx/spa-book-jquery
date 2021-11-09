@@ -102,23 +102,23 @@ spa.fake = (function () {
           listchange_idto = undefined;
         }
         send_listchange();
-      };
-
-      emit_mock_msg = function() {
-        setTimeout(function() {
-          var user = spa.model.people.get_user();
-          if(callback_map.updatechat) {
-            callback_map.updatechat([{
-              dest_id: user.id,
-              dest_name: user.name,
-              sender_id: 'id_04',
-              msg_text: 'Hi there' + user.name + '! Wilma here.'
-            }]);
-          } else {
-            emit_mock_msg();
-          }
-        },8000)
       }
+    };
+    
+    emit_mock_msg = function() {
+      setTimeout(function() {
+        var user = spa.model.people.get_user();
+        if(callback_map.updatechat) {
+          callback_map.updatechat([{
+            dest_id: user.id,
+            dest_name: user.name,
+            sender_id: 'id_04',
+            msg_text: 'Hi there' + user.name + '! Wilma here.'
+          }]);
+        } else {
+          emit_mock_msg();
+        }
+      },8000);
     };
 
     send_listchange = function() {
